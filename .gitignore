@@ -1,0 +1,46 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example
+local_settings.py
+
+# --- Django ---
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# --- Customer uploads (never commit photos) ---
+uploads/
+
+# --- Testing / linting caches ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Docker local overrides ---
+docker-compose.override.yml
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
