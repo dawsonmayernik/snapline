@@ -1,0 +1,48 @@
+{% extends "rep_base.html" %}
+{% block title %}Dashboard · Snapline{% endblock %}
+{% block content %}
+  <h1 class="h1 mb-6">Dashboard</h1>
+  <div class="grid-12">
+    <section class="tile col-4">
+      <h2 class="h3 mb-5">New session</h2>
+      <form method="post" action="{% url 'sessions_app:create_session' %}">
+        {% csrf_token %}
+        {% include "includes/field.html" with field=form.ticket_reference %}
+        {% include "includes/field.html" with field=form.phone %}
+        <button type="submit" class="btn btn-primary">Create session</button>
+      </form>
+    </section>
+
+    <section class="table-wrap col-8">
+      <div class="table-title"><h2 class="h3">Your open sessions</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Ticket reference</th>
+            <th scope="col">Phone</th>
+            <th scope="col">Status</th>
+            <th scope="col">Expires in</th>
+          </tr>
+        </thead>
+        {% if open_sessions %}
+          <tbody>
+            {% for s in open_sessions %}
+              <tr>
+                <td class="mono"><a href="{% url 'sessions_app:session_detail' s.pk %}">{{ s.ticket_reference|default:"No ticket" }}</a></td>
+                <td class="mono">{% if s.phone_hint %}···{{ s.phone_hint }}{% else %}—{% endif %}</td>
+                <td><span class="tag tag-{{ s.status }}">{{ s.get_status_display }}</span></td>
+                <td class="mono">{{ s.expires_at|timeuntil }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        {% endif %}
+      </table>
+      {% if not open_sessions %}
+        <div class="empty">
+          <p class="h3">No open sessions</p>
+          <p class="muted">Create a session to get a link you can text to a customer.</p>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

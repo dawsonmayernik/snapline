@@ -1,0 +1,60 @@
+{% extends "rep_base.html" %}
+{% block title %}Session {{ support_session.ticket_reference }} · Snapline{% endblock %}
+{% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'sessions_app:dashboard' %}">Dashboard</a>
+    <span class="sep" aria-hidden="true">/</span>
+    <span aria-current="page">Session</span>
+  </nav>
+
+  <div class="page-head">
+    <h1 class="h1">Session {% if support_session.ticket_reference %}<span class="mono">{{ support_session.ticket_reference }}</span>{% endif %}</h1>
+    <span class="tag tag-{{ support_session.status }}">{{ support_session.get_status_display }}</span>
+    <span class="meta muted mono">
+      {% if support_session.phone_hint %}Phone ···{{ support_session.phone_hint }} · {% endif %}{% if support_session.is_open %}Expires in {{ support_session.expires_at|timeuntil }}{% else %}Ended{% endif %}
+    </span>
+  </div>
+
+  <div class="grid-12">
+    <div class="col-4 stack">
+      {% include "includes/code_tile.html" with note="Read this to the customer. Their page shows the same code, so they know the link really came from you." %}
+
+      {% if not support_session.is_open %}
+        {% include "includes/notice.html" with kind="info" title="Session ended." message="This session is closed or has expired. Its link no longer works." %}
+      {% elif join_url %}
+        {% include "includes/notice.html" with kind="warning" title="This link is shown only once." message="Copy it now. If it's lost, generate a new one (the old one stops working)." %}
+        <div class="field">
+          <label for="customer-link">Customer link</label>
+          <div class="input-group">
+            <input id="customer-link" class="mono" type="text" value="{{ join_url }}" readonly>
+            <button type="button" class="btn btn-primary btn-compact" data-copy-target="customer-link" hidden>Copy</button>
+          </div>
+          <p class="helper">Text this link to the customer.</p>
+        </div>
+      {% else %}
+        {% include "includes/notice.html" with kind="info" title="Link no longer shown." message="For security, the customer link is shown only once. If the customer lost it, generate a new link. The old one will stop working." %}
+      {% endif %}
+
+      {% if support_session.is_open %}
+        <div class="actions">
+          <form method="post" action="{% url 'sessions_app:reissue_link' support_session.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary">Generate new link</button>
+          </form>
+          <form method="post" action="{% url 'sessions_app:close_session' support_session.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Close session</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <section class="tile col-8">
+      <h2 class="h3">Photos</h2>
+      <div class="empty-plain">
+        <p>No photos yet.</p>
+        <p class="muted">Photos appear here as soon as the customer sends them.</p>
+      </div>
+    </section>
+  </div>
+{% endblock %}

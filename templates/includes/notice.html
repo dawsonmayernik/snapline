@@ -1,0 +1,8 @@
+<div class="notice notice-{{ kind }}" role="{% if kind == 'info' %}status{% else %}alert{% endif %}">
+  {% if kind == "info" %}
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5V7h1.5v4.5zM8 5.75a.875.875 0 110-1.75.875.875 0 010 1.75z"/></svg>
+  {% elif kind == "warning" %}
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1L.5 14.5h15L8 1zm.75 11h-1.5v-1.5h1.5V12zm0-3h-1.5V5.5h1.5V9z"/></svg>
+  {% endif %}
+  <div><b>{{ title }}</b>{{ message }}</div>
+</div>

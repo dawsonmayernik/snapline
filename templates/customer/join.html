@@ -1,0 +1,16 @@
+{% extends "customer_base.html" %}
+{% block title %}Photo support · Snapline{% endblock %}
+{% block content %}
+  <div class="stack">
+    <h1 class="h1">Send photos to your support rep</h1>
+    {% include "includes/code_tile.html" with note="Your support rep should read this code to you. If it doesn't match, close this page." %}
+    <section>
+      <h2 class="h3">Before you start</h2>
+      <ul class="plain-list">
+        <li>Only photos you choose are shared.</li>
+        <li>Check each photo for passwords, sticky notes, screens, documents, or people before sending.</li>
+        <li>Location data is removed from your photos.</li>
+      </ul>
+    </section>
+  </div>
+{% endblock %}

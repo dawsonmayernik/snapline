@@ -13,8 +13,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 
 from datetime import timedelta
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -69,6 +69,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "sessions_app.context_processors.snapline",
             ],
         },
     },
@@ -105,7 +106,7 @@ PASSWORD_HASHERS = [
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",  # pylint: disable=line-too-long
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
@@ -155,3 +156,16 @@ SNAPLINE_SESSION_TTL = timedelta(hours=2)
 # Uploaded photos. Intentionally no MEDIA_URL: photos are served only
 # through authenticated views, never as public static files.
 MEDIA_ROOT = BASE_DIR / "uploads"
+
+# Authentication
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "sessions_app:dashboard"
+LOGOUT_REDIRECT_URL = "login"
+
+# Snapline links
+SNAPLINE_PUBLIC_BASE_URL = os.environ.get(
+    "SNAPLINE_PUBLIC_BASE_URL", "http://127.0.0.1:8000"
+)
+SNAPLINE_SOURCE_URL = os.environ.get(
+    "SNAPLINE_SOURCE_URL", "https://github.com/dawsonmayernik/snapline"
+)
