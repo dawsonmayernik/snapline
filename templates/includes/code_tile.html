@@ -1,0 +1,5 @@
+<div class="code-tile">
+  <span class="label">Verification code</span>
+  <p class="code" aria-label="{{ support_session.verification_code_spoken }}">{{ support_session.verification_code|slice:":3" }} {{ support_session.verification_code|slice:"3:" }}</p>
+  <p class="note">{{ note }}</p>
+</div>

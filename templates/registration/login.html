@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Log in · Snapline{% endblock %}
+{% block content %}
+  <div class="login">
+    <h1 class="h1 mb-6">Log in to Snapline</h1>
+    {% if form.errors %}
+      <div class="mb-6">
+        {% include "includes/notice.html" with kind="error" title="Login failed." message="Your username and password didn't match. Please try again." %}
+      </div>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {% include "includes/field.html" with field=form.username %}
+      {% include "includes/field.html" with field=form.password %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="btn btn-primary">Log in</button>
+    </form>
+  </div>
+{% endblock %}

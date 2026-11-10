@@ -159,6 +159,18 @@ class SupportSession(models.Model):
         """
         return self.status != self.Status.CLOSED and timezone.now() < self.expires_at
 
+    @property
+    def verification_code_spoken(self) -> str:
+        """The verification code with spaces between digits.
+
+        Used as the code's accessible label so screen readers announce
+        each digit separately instead of reading one large number.
+
+        Returns:
+            The code's digits separated by spaces, e.g. "1 2 3 4 5 6".
+        """
+        return " ".join(self.verification_code)
+
     def close(self) -> None:
         """Closes the session and revokes any outstanding join links."""
         now = timezone.now()
@@ -207,6 +219,19 @@ class JoinToken(models.Model):
             The session label and token issue time; never the token.
         """
         return f"Token for {self.session} issued {self.created_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def is_usable(self) -> bool:
+        """Whether the token can still be used to join its session.
+
+        Returns:
+            True if the token is unused, unrevoked, and unexpired.
+        """
+        return (
+            self.used_at is None
+            and self.revoked_at is None
+            and timezone.now() < self.expires_at
+        )
 
     @staticmethod
     def hash_token(raw_token: str) -> str:
