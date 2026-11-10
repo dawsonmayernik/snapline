@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 88
+target-version = ["py314"]
+extend-exclude = "migrations"
+
+[tool.pylint.main]
+load-plugins = ["pylint_django"]
+django-settings-module = "snapline.settings"
+ignore = ["migrations"]
+
+[tool.pylint.format]
+max-line-length = 88
