@@ -91,7 +91,7 @@ class SupportSession(models.Model):
         ACTIVE = "active", "Customer connected"
 
         # The CSR ended the session; no further uploads are accepted.
-        CLOSED = "closed" "Closed"
+        CLOSED = "closed", "Closed"
 
     # Random UUID so session IDs in URLs cannot be guessed or enumerated.
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -237,6 +237,9 @@ class JoinToken(models.Model):
         now = timezone.now()
         with transaction.atomic():
             cls.objects.filter(
+                session=session, used_at__isnull=True, revoked_at__isnull=True
+            ).update(revoked_at=now)
+            token = cls.objects.create(
                 session=session,
                 token_hash=cls.hash_token(raw_token),
                 expires_at=now + settings.SNAPLINE_JOIN_TOKEN_TTL,
