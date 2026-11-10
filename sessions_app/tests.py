@@ -1,13 +1,15 @@
 """Tests for support session views and the customer join page."""
 
 from datetime import timedelta
+from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import JoinToken, SupportSession
+from .models import ConsentRecord, JoinToken, SupportSession
 
 ## Placeholder password used for test accounts only.
 TEST_PASSWORD = "test-password"
@@ -145,3 +147,126 @@ class CustomerJoinViewTests(TestCase):
         """The join page tells browsers and proxies not to cache it."""
         response = self._join(self.raw_token)
         self.assertIn("no-store", response["Cache-Control"])
+
+
+class CustomerConsentTests(TestCase):
+    """Tests for the customer accepting terms and joining a session."""
+
+    def setUp(self):
+        """Create a rep, an open session, and a fresh join token."""
+        csr = get_user_model().objects.create_user("csr", password=TEST_PASSWORD)
+        self.support_session = SupportSession.objects.create(created_by=csr)
+        self.token, self.raw_token = JoinToken.issue(self.support_session)
+        self.join_url = reverse("sessions_app:customer_join", args=[self.raw_token])
+        self.capture_url = reverse("sessions_app:customer_capture")
+
+    def _consent(self, client=None):
+        """Submit the consent form, as a given browser.
+
+        Params:
+            client: The test client to use; defaults to self.client.
+
+        Returns:
+            The HTTP response.
+        """
+        return (client or self.client).post(self.join_url)
+
+    def test_consent_joins_session(self):
+        """Consenting uses the link, records consent, and connects."""
+        response = self._consent()
+        self.assertRedirects(response, self.capture_url)
+        self.token.refresh_from_db()
+        self.support_session.refresh_from_db()
+        self.assertIsNotNone(self.token.used_at)
+        self.assertEqual(self.support_session.status, SupportSession.Status.ACTIVE)
+        consent = ConsentRecord.objects.get()
+        self.assertEqual(consent.join_token, self.token)
+        self.assertEqual(
+            consent.policy_version, settings.SNAPLINE_PRIVACY_POLICY_VERSION
+        )
+
+    def test_link_works_only_once(self):
+        """A second browser cannot reuse a link that was already used."""
+        self._consent()
+        response = self._consent(client=Client())
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(ConsentRecord.objects.count(), 1)
+
+    def test_retapping_link_returns_customer_to_session(self):
+        """The customer who joined can reopen the link without error."""
+        self._consent()
+        response = self.client.get(self.join_url)
+        self.assertRedirects(response, self.capture_url)
+
+    def test_other_browser_cannot_open_used_link(self):
+        """A used link shows "expired" to anyone but the customer."""
+        self._consent()
+        response = Client().get(self.join_url)
+        self.assertEqual(response.status_code, 410)
+
+    def test_capture_requires_joining(self):
+        """The session page is blocked for browsers that never joined."""
+        response = self.client.get(self.capture_url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_capture_shows_session_after_joining(self):
+        """A customer who joined can see their session page."""
+        self._consent()
+        response = self.client.get(self.capture_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "customer/capture.html")
+
+    def test_closed_session_ends_customer_access(self):
+        """When the rep closes the session, the customer is locked out."""
+        self._consent()
+        self.support_session.close()
+        response = self.client.get(self.capture_url)
+        self.assertEqual(response.status_code, 410)
+        self.assertTemplateUsed(response, "customer/ended.html")
+
+    def test_revoked_link_cannot_be_consented(self):
+        """A link replaced by a newer one cannot be used to join."""
+        JoinToken.issue(self.support_session)
+        response = self._consent()
+        self.assertEqual(response.status_code, 410)
+        self.assertFalse(ConsentRecord.objects.exists())
+
+    def test_consent_rotates_session_key(self):
+        """Joining issues a fresh session ID (prevents session fixation)."""
+        self.client.get(self.join_url)
+        self.client.session.save()
+        key_before = self.client.session.session_key
+        self._consent()
+        self.assertNotEqual(self.client.session.session_key, key_before)
+
+    def test_customer_access_expires_with_session(self):
+        """The customer's access ends when the support session expires."""
+        self._consent()
+        self.assertEqual(
+            self.client.session.get_expiry_date(), self.support_session.expires_at
+        )
+
+    def test_consent_requires_csrf_token(self):
+        """A forged consent POST from another site is rejected."""
+        response = self._consent(client=Client(enforce_csrf_checks=True))
+        self.assertEqual(response.status_code, 403)
+        self.token.refresh_from_db()
+        self.assertIsNone(self.token.used_at)
+
+    def test_head_request_does_not_consume_link(self):
+        """Link scanners sending HEAD requests must not burn the link."""
+        response = self.client.head(self.join_url)
+        self.assertEqual(response.status_code, 405)
+        self.token.refresh_from_db()
+        self.assertIsNone(self.token.used_at)
+
+    def test_simultaneous_consents_only_one_wins(self):
+        """If two taps race, only the first one joins the session."""
+        stale_token = JoinToken.objects.get(pk=self.token.pk)
+        self.token.consume()
+        with mock.patch(
+            "sessions_app.views._find_join_token", return_value=stale_token
+        ):
+            response = self._consent()
+        self.assertEqual(response.status_code, 410)
+        self.assertFalse(ConsentRecord.objects.exists())

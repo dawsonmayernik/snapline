@@ -2,17 +2,25 @@
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import (
+    require_GET,
+    require_http_methods,
+    require_POST,
+)
 
 from .forms import NewSessionForm
-from .models import JoinToken, SupportSession
+from .models import ConsentRecord, JoinToken, SupportSession
 
 # Prefix for the server-side session key holding a link not yet shown.
 _PENDING_LINK_KEY_PREFIX = "snapline_pending_link:"
+
+## Server-side session key holding the ID of the join token a customer redeemed.
+_CUSTOMER_TOKEN_KEY = "snapline_customer_join_token"
 
 
 def _pending_link_key(support_session: SupportSession) -> str:
@@ -198,7 +206,54 @@ def close_session(request, pk):
     return redirect("sessions_app:dashboard")
 
 
-@require_GET
+def _find_join_token(raw_token: str):
+    """Look up a join token by the raw value from the customer's link.
+
+    Params:
+        raw_token: The raw token from the URL.
+
+    Returns:
+        The matching JoinToken with its session loaded, or None.
+    """
+    return (
+        JoinToken.objects.select_related("session")
+        .filter(token_hash=JoinToken.hash_token(raw_token))
+        .first()
+    )
+
+
+def _customer_session(request):
+    """Find the support session this customer's browser has joined.
+
+    Params:
+        request: The current request from the customer.
+    Returns:
+        The joined SupportSession, or None if this browser has no access.
+    """
+    token_id = request.session.get(_CUSTOMER_TOKEN_KEY)
+    if token_id is None:
+        return None
+    join_token = (
+        JoinToken.objects.select_related("session")
+        .filter(pk=token_id, used_at__isnull=False, revoked_at__isnull=True)
+        .first()
+    )
+    return join_token.session if join_token else None
+
+
+def _grant_customer_access(request, join_token: JoinToken) -> None:
+    """Give this browser access to the session it just joined.
+
+    Params:
+        request: The current request from the customer.
+        join_token: The join token the customer just redeemed.
+    """
+    request.session.cycle_key()
+    request.session[_CUSTOMER_TOKEN_KEY] = join_token.pk
+    request.session.set_expiry(join_token.session.expires_at)
+
+
+@require_http_methods(["GET", "POST"])
 @never_cache
 def customer_join(request, token):
     """Landing page the customer reaches from the SMS link.
@@ -208,15 +263,51 @@ def customer_join(request, token):
         token: The raw join token from the URL.
 
     Returns:
-        The landing page, or a 410 page if the link is no longer valid.
+        The landing page, a redirect to the session, or a 410 page if
+        the link is no longer valid.
     """
-    join_token = (
-        JoinToken.objects.select_related("session")
-        .filter(token_hash=JoinToken.hash_token(token))
-        .first()
-    )
+    join_token = _find_join_token(token)
+    if join_token is not None and _customer_session(request) == join_token.session:
+        return redirect("sessions_app:customer_capture")
     if join_token is None or not join_token.is_usable or not join_token.session.is_open:
         return render(request, "customer/link_invalid.html", status=410)
+    if request.method == "GET":
+        return render(
+            request, "customer/join.html", {"support_session": join_token.session}
+        )
+
+    with transaction.atomic():
+        if not join_token.consume():
+            return render(request, "customer/link_invalid.html", status=410)
+        ConsentRecord.objects.create(
+            session=join_token.session,
+            join_token=join_token,
+            policy_version=settings.SNAPLINE_PRIVACY_POLICY_VERSION,
+        )
+        SupportSession.objects.filter(
+            pk=join_token.session.pk, status=SupportSession.Status.PENDING
+        ).update(status=SupportSession.Status.ACTIVE)
+    _grant_customer_access(request, join_token)
+    return redirect("sessions_app:customer_capture")
+
+
+@require_GET
+@never_cache
+def customer_capture(request):
+    """The customer's page for their joined support session.
+
+    Params:
+        request: The current request from the customer.
+
+    Returns:
+        The session page; the ended page if the rep closed the session
+        or it expired; or a 403 page if this browser never joined a session.
+    """
+    support_session = _customer_session(request)
+    if support_session is None:
+        return render(request, "customer/link_invalid.html", status=403)
+    if not support_session.is_open:
+        return render(request, "customer/ended.html", status=410)
     return render(
-        request, "customer/join.html", {"support_session": join_token.session}
+        request, "customer/capture.html", {"support_session": support_session}
     )

@@ -31,7 +31,11 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -169,3 +173,7 @@ SNAPLINE_PUBLIC_BASE_URL = os.environ.get(
 SNAPLINE_SOURCE_URL = os.environ.get(
     "SNAPLINE_SOURCE_URL", "https://github.com/dawsonmayernik/snapline"
 )
+
+# Bump this whenever the customer-facing privacy notes change, so each
+# consent record shows which version the customer actually saw.
+SNAPLINE_PRIVACY_POLICY_VERSION = "2026-11"

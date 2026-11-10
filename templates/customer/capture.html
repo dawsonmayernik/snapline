@@ -1,0 +1,9 @@
+{% extends "customer_base.html" %}
+{% block title %}Connected · Snapline{% endblock %}
+{% block content %}
+  <div class="stack">
+    {% include "includes/notice.html" with kind="info" title="You're connected." message="Your support rep can see that you've joined." %}
+    <h1 class="h1">Stay on this page</h1>
+    <p>Keep this page open while you talk with your support rep. They'll guide you through taking photos.</p>
+  </div>
+{% endblock %}
