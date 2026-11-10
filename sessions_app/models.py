@@ -300,13 +300,19 @@ class JoinToken(models.Model):
 class ConsentRecord(models.Model):
     """Proof that the customer accepted the privacy terms.
 
-    Records which version of the policy was accepted and when, so the
-    organization can show what the customer agreed to.
+    Records which version of the policy was accepted, when, and through
+    which join link, so the organization can show what the customer agreed
+    to. A session can have several consents if the rep issued a new link.
     """
 
-    # The session the consent applies to; one consent per session.
+    # The session the consent applies to.
     session = models.OneToOneField(
         SupportSession, on_delete=models.CASCADE, related_name="consent"
+    )
+
+    # The join link the customer accepted through, each link is used once.
+    join_token = models.OneToOneField(
+        JoinToken, on_delete=models.CASCADE, related_name="consent"
     )
 
     # Version label of the privacy policy shown to the customer.

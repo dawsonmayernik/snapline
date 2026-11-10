@@ -12,5 +12,9 @@
         <li>Location data is removed from your photos.</li>
       </ul>
     </section>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-lg">I understand, continue</button>
+    </form>
   </div>
 {% endblock %}
