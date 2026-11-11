@@ -543,3 +543,81 @@ p {
 .plain-list li + li {
   margin-top: var(--sp-3);
 }
+
+/* Photos */
+.btn-tall {
+  height: 96px;
+  font-size: var(--fs-20);
+}
+.review-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--layer);
+}
+
+.gallery {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--sp-5);
+}
+.thumb {
+  display: block;
+  background: var(--background);
+  color: var(--foreground);
+  text-decoration: none;
+}
+.thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.thumb .cap {
+  display: block;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-12);
+}
+.thumb:hover .cap {
+  text-decoration: underline;
+}
+
+.photo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-row img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  flex: none;
+}
+.list-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.list-row form {
+  margin: 0;
+}
+.link-danger {
+  background: none;
+  border: 0;
+  padding: var(--sp-3);
+  font: inherit;
+  color: var(--danger);
+  cursor: pointer;
+}
+.link-danger:hover {
+  text-decoration: underline;
+}

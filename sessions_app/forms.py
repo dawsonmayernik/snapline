@@ -63,3 +63,9 @@ class NewSessionForm(forms.Form):
             The last PHONE_HINT_DIGITS digits, or "" if no phone was given.
         """
         return self.cleaned_data["phone"][-PHONE_HINT_DIGITS:]
+
+
+class PhotoUploadForm(forms.Form):
+    """Form carrying one photo from the customer's phone."""
+
+    photo = forms.FileField()

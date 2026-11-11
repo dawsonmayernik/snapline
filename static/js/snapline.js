@@ -1,5 +1,6 @@
 /**
- * Small progressive enhancements: theme toggle and copy-to-clipboard.
+ * Small progressive enhancements: theme toggle, copy-to-clipboard, and the
+ * photo capture flow.
  *
  * Every page works without this script. It is loaded in <head> (not deferred)
  * so the saved theme is applied before the first paint, avoiding a flash of
@@ -10,7 +11,6 @@
 
   /** localStorage key holding the viewer's theme choice. */
   var THEME_KEY = "snapline-theme";
-  
   /** How long the Copy button shows "Copied" before resetting, in ms. */
   var COPIED_RESET_MS = 2000;
 
@@ -91,11 +91,69 @@
     button.hidden = false;
   }
 
+  /**
+   * Turn the plain photo form into Take photo -> review -> Send/Retake.
+   *
+   * Without this script the page still works as a file picker plus a Send
+   * button. With it, the picker is hidden behind a large "Take photo"
+   * button, and the photo is previewed before the customer can send it.
+   *
+   * @param form The capture form element.
+   */
+  function setUpCapture(form) {
+    var input = document.getElementById("capture-input");
+    var picker = document.getElementById("capture-picker");
+    var start = document.getElementById("capture-start");
+    var review = document.getElementById("capture-review");
+    var preview = document.getElementById("capture-preview");
+    var send = document.getElementById("capture-send");
+    var retake = document.getElementById("capture-retake");
+    var previewUrl = null;
+
+    function showReview(hasPhoto) {
+      start.hidden = hasPhoto;
+      review.hidden = !hasPhoto;
+      send.hidden = !hasPhoto;
+      retake.hidden = !hasPhoto;
+    }
+
+    input.addEventListener("change", function () {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+      var file = input.files && input.files[0];
+      if (file) {
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+      }
+      showReview(Boolean(file));
+    });
+
+    function openCamera() {
+      input.click();
+    }
+    start.addEventListener("click", openCamera);
+    retake.addEventListener("click", openCamera);
+
+    form.addEventListener("submit", function () {
+      send.disabled = true;
+      send.textContent = "Sending...";
+    });
+
+    picker.hidden = true;
+    showReview(false);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     var themeButton = document.getElementById("theme-toggle");
     if (themeButton) {
       setUpThemeToggle(themeButton);
     }
     document.querySelectorAll("[data-copy-target]").forEach(setUpCopyButton);
+    var captureForm = document.getElementById("capture-form");
+    if (captureForm) {
+      setUpCapture(captureForm);
+    }
   });
 })();

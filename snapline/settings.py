@@ -157,6 +157,13 @@ MAILERS = {
 SNAPLINE_JOIN_TOKEN_TTL = timedelta(minutes=15)
 SNAPLINE_SESSION_TTL = timedelta(hours=2)
 
+# Photo uploads
+SNAPLINE_MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB
+SNAPLINE_MAX_IMAGE_PIXELS = 60_000_000  # covers 48-megapixel phone cameras
+SNAPLINE_PHOTO_MAX_DIMENSION = 2560  # stored photos are shrunk to fit this
+SNAPLINE_PHOTO_JPEG_QUALITY = 85
+SNAPLINE_MAX_PHOTOS_PER_SESSION = 50
+
 # Uploaded photos. Intentionally no MEDIA_URL: photos are served only
 # through authenticated views, never as public static files.
 MEDIA_ROOT = BASE_DIR / "uploads"

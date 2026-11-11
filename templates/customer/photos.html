@@ -1,0 +1,27 @@
+{% extends "customer_base.html" %}
+{% block title %}Sent photos · Snapline{% endblock %}
+{% block content %}
+  <div class="stack">
+    <h1 class="h1">Sent photos</h1>
+    {% if photos %}
+      <ul class="photo-list">
+        {% for photo in photos %}
+          <li class="list-row">
+            <img src="{% url 'sessions_app:customer_photo_image' photo.pk %}" alt="Photo {{ forloop.counter }}">
+            <div class="list-row-text">
+              <p>Photo {{ forloop.counter }}</p>
+              <p class="muted mono">Sent {{ photo.uploaded_at|time:"H:i:s" }}</p>
+            </div>
+            <form method="post" action="{% url 'sessions_app:customer_photo_delete' photo.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="link-danger" aria-label="Delete photo {{ forloop.counter }}">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">You haven't sent any photos yet.</p>
+    {% endif %}
+    <a class="btn btn-primary btn-lg" href="{% url 'sessions_app:customer_capture' %}">Take {% if photos %}another{% else %}a{% endif %} photo</a>
+  </div>
+{% endblock %}

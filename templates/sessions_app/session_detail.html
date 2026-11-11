@@ -50,11 +50,24 @@
     </div>
 
     <section class="tile col-8">
-      <h2 class="h3">Photos</h2>
-      <div class="empty-plain">
-        <p>No photos yet.</p>
-        <p class="muted">Photos appear here as soon as the customer sends them.</p>
-      </div>
+      <h2 class="h3 mb-5">Photos</h2>
+      {% if photos %}
+        <ul class="gallery">
+          {% for photo in photos %}
+            <li>
+              <a class="thumb" href="{% url 'sessions_app:rep_photo_image' support_session.pk photo.pk %}" target="_blank" rel="noopener">
+                <img src="{% url 'sessions_app:rep_photo_image' support_session.pk photo.pk %}" alt="Customer photo {{ forloop.counter }}">
+                <span class="cap"><span class="mono">{{ photo.uploaded_at|time:"H:i:s" }}</span> · Photo {{ forloop.counter }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-plain">
+          <p>No photos yet.</p>
+          <p class="muted">Photos appear here as soon as the customer sends them. Reload to check for new ones.</p>
+        </div>
+      {% endif %}
     </section>
   </div>
 {% endblock %}

@@ -1,8 +1,10 @@
 """Views for support reps (dashboard, sessions) and the customer join page."""
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -13,14 +15,19 @@ from django.views.decorators.http import (
     require_POST,
 )
 
-from .forms import NewSessionForm
-from .models import ConsentRecord, JoinToken, SupportSession
+from .forms import NewSessionForm, PhotoUploadForm
+from .images import InvalidImageError, sanitize_photo
+from .models import ConsentRecord, JoinToken, Photo, SupportSession
 
 # Prefix for the server-side session key holding a link not yet shown.
 _PENDING_LINK_KEY_PREFIX = "snapline_pending_link:"
 
-## Server-side session key holding the ID of the join token a customer redeemed.
+# Server-side session key holding the ID of the join token a customer redeemed.
 _CUSTOMER_TOKEN_KEY = "snapline_customer_join_token"
+
+# Allowance for multipart form overhead (boundaries, headers, CSRF token)
+# on top of the photo itself when checking a request's declared size.
+_MULTIPART_OVERHEAD_BYTES = 64 * 1024
 
 
 def _pending_link_key(support_session: SupportSession) -> str:
@@ -166,7 +173,11 @@ def session_detail(request, pk):
     return render(
         request,
         "sessions_app/session_detail.html",
-        {"support_session": support_session, "join_url": join_url},
+        {
+            "support_session": support_session,
+            "join_url": join_url,
+            "photos": support_session.photos.all(),
+        },
     )
 
 
@@ -204,6 +215,39 @@ def close_session(request, pk):
     if support_session.status != SupportSession.Status.CLOSED:
         support_session.close()
     return redirect("sessions_app:dashboard")
+
+
+def _photo_response(photo: Photo) -> FileResponse:
+    """Build the HTTP response that serves a stored photo.
+
+    Params:
+        photo: The photo to serve.
+
+    Returns:
+        A streaming response for the image file.
+    """
+    response = FileResponse(photo.image.open("rb"), content_type="image/jpeg")
+    response["Cache-Control"] = "private, no-store"
+    response["Content-Disposition"] = 'inline; filename="photo.jpg"'
+    return response
+
+
+@login_required
+@require_GET
+def rep_photo_image(request, pk, photo_id):
+    """Serve a photo to the rep who owns its session.
+
+    Params:
+        request: The current request.
+        pk: The support session's UUID.
+        photo_id: The photo's UUID.
+
+    Returns:
+        The image, or 404 if the session or photo is not this rep's.
+    """
+    support_session = _get_own_session(request, pk)
+    photo = get_object_or_404(Photo, pk=photo_id, session=support_session)
+    return _photo_response(photo)
 
 
 def _find_join_token(raw_token: str):
@@ -291,23 +335,191 @@ def customer_join(request, token):
     return redirect("sessions_app:customer_capture")
 
 
-@require_GET
-@never_cache
-def customer_capture(request):
-    """The customer's page for their joined support session.
+def _joined_open_session(request):
+    """Resolve the customer's session, or the page to show instead.
 
     Params:
         request: The current request from the customer.
 
     Returns:
-        The session page; the ended page if the rep closed the session
-        or it expired; or a 403 page if this browser never joined a session.
+        A tuple (support_session, error_response). The open session this browser
+        joined, or a ready-to-return response (403 if this browser never joined, the
+        ended page if the session closed or expired).
     """
     support_session = _customer_session(request)
     if support_session is None:
-        return render(request, "customer/link_invalid.html", status=403)
+        return None, render(request, "customer/link_invalid.html", status=403)
     if not support_session.is_open:
-        return render(request, "customer/ended.html", status=410)
+        return None, render(request, "customer/ended.html", status=410)
+    return support_session, None
+
+
+def _render_capture(request, support_session, error=None, status=200):
+    """Render the customer's take-a-photo page.
+
+    Params:
+        request: The current request from the customer.
+        support_session: The customer's open support session.
+        error: An error message to show, or None.
+        status: The HTTP status code to respond with.
+
+    Returns:
+        The rendered capture page.
+    """
     return render(
-        request, "customer/capture.html", {"support_session": support_session}
+        request,
+        "customer/capture.html",
+        {
+            "support_session": support_session,
+            "photo_count": support_session.photos.count(),
+            "error": error,
+        },
+        status=status,
     )
+
+
+@require_GET
+@never_cache
+def customer_capture(request):
+    """The customer's page for taking and sending photos.
+
+    Params:
+        request: The current request from the customer.
+
+    Returns:
+        The capture page, or the page from _joined_open_session().
+    """
+    support_session, error_response = _joined_open_session(request)
+    if error_response:
+        return error_response
+    return _render_capture(request, support_session)
+
+
+def _validate_upload(request):
+    """Check and sanitize the photo in an upload request.
+
+    Params:
+        request: The current upload request from the customer.
+
+    Returns:
+        A tuple (clean_image, error, status). On success, clean_image is
+        the sanitized photo and error is None. On failure, clean_image is None,
+        error is a message for the customer, and status is the HTTP status
+        (400 invalid, 413 too large).
+    """
+    max_bytes = settings.SNAPLINE_MAX_UPLOAD_BYTES
+    too_large = "That photo is too large to send. Try taking it again."
+    declared = int(request.META.get("CONTENT_LENGTH") or 0)
+    if declared > max_bytes + _MULTIPART_OVERHEAD_BYTES:
+        return None, too_large, 413
+
+    form = PhotoUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return None, "Choose a photo to send.", 400
+    upload = form.cleaned_data["photo"]
+    if upload.size > max_bytes:
+        return None, too_large, 413
+
+    try:
+        return sanitize_photo(upload), None, 200
+    except InvalidImageError:
+        return None, "That file isn't a photo we can use. Try taking it again.", 400
+
+
+@require_POST
+@never_cache
+def customer_upload(request):
+    """Receive, sanitize, and store a photo from the customer.
+
+    Params:
+        request: The current request from the customer.
+
+    Returns:
+        A redirect back to the capture page, or the capture page with
+        an error (400 invalid, 409 photo limit reached, 413 too large).
+    """
+    support_session, error_response = _joined_open_session(request)
+    if error_response:
+        return error_response
+    clean_image, error, status = _validate_upload(request)
+    if error:
+        return _render_capture(request, support_session, error, status=status)
+
+    with transaction.atomic():
+        # Lock the session row so simultaneous uploads cannot exceed the limit.
+        locked = SupportSession.objects.select_for_update().get(pk=support_session.pk)
+        if locked.photos.count() >= settings.SNAPLINE_MAX_PHOTOS_PER_SESSION:
+            return _render_capture(
+                request,
+                support_session,
+                "This session has reached its photo limit.",
+                status=409,
+            )
+        Photo.objects.create(session=locked, image=clean_image)
+
+    messages.success(request, "Photo sent.")
+    return redirect("sessions_app:customer_capture")
+
+
+@require_GET
+@never_cache
+def customer_photos(request):
+    """List the photos the customer has sent in this session.
+
+    Params:
+        request: The current request from the customer.
+
+    Returns:
+        The sent-photos page, or the page from _joined_open_session().
+    """
+    support_session, error_response = _joined_open_session(request)
+    if error_response:
+        return error_response
+    return render(
+        request,
+        "customer/photos.html",
+        {"support_session": support_session, "photos": support_session.photos.all()},
+    )
+
+
+@require_GET
+def customer_photo_image(request, photo_id):
+    """Serve one of the customer's own photos back to them.
+
+    Params:
+        request: The current request from the customer.
+        photo_id: The photo's UUID.
+
+    Returns:
+        The image, 404 if it is not in this customer's session, or the
+        page from _joined_open_session().
+    """
+    support_session, error_response = _joined_open_session(request)
+    if error_response:
+        return error_response
+    photo = get_object_or_404(Photo, pk=photo_id, session=support_session)
+    return _photo_response(photo)
+
+
+@require_POST
+def customer_photo_delete(request, photo_id):
+    """Permanently delete one of the customer's photos.
+
+    Removes both the database row and the stored file, so the rep can no
+    longer see it.
+
+    Params:
+        request: The current request from the customer.
+        photo_id: The photo's UUID.
+
+    Returns:
+        A redirect to the sent-photos page, 404 if the photo is not in
+        this customer's session, or the page from _joined_open_session().
+    """
+    support_session, error_response = _joined_open_session(request)
+    if error_response:
+        return error_response
+    photo = get_object_or_404(Photo, pk=photo_id, session=support_session)
+    photo.delete()
+    messages.success(request, "Photo deleted.")
+    return redirect("sessions_app:customer_photos")
