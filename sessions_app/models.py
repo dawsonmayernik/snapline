@@ -1,4 +1,5 @@
-"""Data model for Snapline photo support sessions.
+"""
+Data model for Snapline photo support sessions.
 
 A support rep (CSR) opens a SupportSession, which issues a single-use
 JoinToken sent to the customer as a link. The customer accepts the privacy

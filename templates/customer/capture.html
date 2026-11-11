@@ -1,9 +1,33 @@
 {% extends "customer_base.html" %}
-{% block title %}Connected · Snapline{% endblock %}
+{% block title %}Take a photo · Snapline{% endblock %}
 {% block content %}
   <div class="stack">
-    {% include "includes/notice.html" with kind="info" title="You're connected." message="Your support rep can see that you've joined." %}
-    <h1 class="h1">Stay on this page</h1>
-    <p>Keep this page open while you talk with your support rep. They'll guide you through taking photos.</p>
+    {% if error %}
+      {% include "includes/notice.html" with kind="error" title="Not sent." message=error %}
+    {% endif %}
+
+    <h1 class="h1">Take a photo</h1>
+    <p class="muted">You'll be able to check it before it's sent.</p>
+
+    <form id="capture-form" class="stack" method="post" action="{% url 'sessions_app:customer_upload' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="field" id="capture-picker">
+        <label for="capture-input">Photo</label>
+        <input id="capture-input" type="file" name="photo" accept="image/*" capture="environment" required>
+      </div>
+      <button type="button" id="capture-start" class="btn btn-primary btn-lg btn-tall" hidden>Take photo</button>
+
+      <div id="capture-review" class="stack" hidden>
+        <h2 class="h3">Check your photo</h2>
+        <p class="muted">Look for passwords, sticky notes, screens, documents, or people.</p>
+        <img id="capture-preview" class="review-image" alt="The photo you just took">
+      </div>
+      <button type="submit" id="capture-send" class="btn btn-primary btn-lg">Send</button>
+      <button type="button" id="capture-retake" class="btn btn-secondary btn-lg" hidden>Retake</button>
+    </form>
+
+    {% if photo_count %}
+      <a class="btn btn-secondary btn-lg" href="{% url 'sessions_app:customer_photos' %}">View sent photos ({{ photo_count }})</a>
+    {% endif %}
   </div>
 {% endblock %}
