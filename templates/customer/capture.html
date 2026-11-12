@@ -10,7 +10,7 @@
     <h1 class="h1">Take a photo</h1>
     <p class="muted">You'll be able to check it before it's sent.</p>
 
-    <form id="capture-form" class="stack" method="post" action="{% url 'sessions_app:customer_upload' %}" enctype="multipart/form-data">
+    <form id="capture-form" class="stack" method="post" action="{% url 'sessions_app:customer_upload' %}" enctype="multipart/form-data" data-max-dimension="{{ photo_max_dimension }}">
       {% csrf_token %}
       <div class="field" id="capture-picker">
         <label for="capture-input">Photo</label>
@@ -22,6 +22,14 @@
         <h2 class="h3">Check your photo</h2>
         <p class="muted">Look for passwords, sticky notes, screens, documents, or people.</p>
         <img id="capture-preview" class="review-image" alt="The photo you just took">
+        <canvas id="capture-canvas" class="review-image" hidden>The photo you just took</canvas>
+        <div id="hide-tools" class="stack" hidden>
+          <div class="actions">
+            <button type="button" id="hide-toggle" class="btn btn-secondary" aria-pressed="false">Hide an area</button>
+            <button type="button" id="hide-undo" class="btn btn-secondary" hidden>Undo</button>
+          </div>
+          <p id="hide-help" class="helper" hidden>Drag over anything you want to hide. It's covered with a solid box on your phone, before the photo is sent.</p>
+        </div>
       </div>
       <button type="submit" id="capture-send" class="btn btn-primary btn-lg">Send</button>
       <button type="button" id="capture-retake" class="btn btn-secondary btn-lg" hidden>Retake</button>

@@ -628,3 +628,15 @@ p {
 #rep-request .notice {
   margin-bottom: var(--sp-5);
 }
+
+/* Hide-an-area tool */
+canvas.review-image.hiding {
+  cursor: crosshair;
+  touch-action: none;
+  outline: 2px solid var(--warn-accent);
+  outline-offset: -2px;
+}
+.btn[aria-pressed="true"] {
+  background: var(--layer-hover);
+  border-color: var(--warn-accent);
+}
