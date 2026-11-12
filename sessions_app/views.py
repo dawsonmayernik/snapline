@@ -501,6 +501,7 @@ def _render_capture(request, support_session, error=None, status=200):
         {
             **_customer_live_context(support_session),
             "photo_count": support_session.photos.count(),
+            "photo_max_dimension": settings.SNAPLINE_PHOTO_MAX_DIMENSION,
             "error": error,
         },
         status=status,
