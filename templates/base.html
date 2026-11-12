@@ -27,7 +27,11 @@
     <main class="{% block main_class %}main{% endblock %}">
       {% for message in messages %}
         <div class="mb-5">
-          {% include "includes/notice.html" with kind="info" title=message message="" %}
+          {% if message.level_tag == "error" %}
+            {% include "includes/notice.html" with kind="error" title=message message="" %}
+          {% else %}
+            {% include "includes/notice.html" with kind="info" title=message message="" %}
+          {% endif %}
         </div>
       {% endfor %}
       {% block content %}{% endblock %}

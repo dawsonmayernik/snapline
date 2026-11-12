@@ -1,0 +1,8 @@
+<div id="rep-request" aria-live="polite"
+  hx-get="{% url 'sessions_app:customer_live' %}?state={{ request_state }}"
+  hx-trigger="every {{ poll_seconds }}s"
+  hx-swap="outerHTML">
+  {% if support_session.photo_request %}
+    {% include "includes/notice.html" with kind="info" title="Your rep sent:" message=support_session.photo_request %}
+  {% endif %}
+</div>

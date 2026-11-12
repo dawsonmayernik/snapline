@@ -14,12 +14,18 @@ urlpatterns = [
     path("sessions/<uuid:pk>/close/", views.close_session, name="close_session"),
     path("sessions/<uuid:pk>/live/", views.session_live, name="session_live"),
     path(
+        "sessions/<uuid:pk>/request/",
+        views.send_photo_request,
+        name="send_photo_request",
+    ),
+    path(
         "sessions/<uuid:pk>/photos/<uuid:photo_id>/",
         views.rep_photo_image,
         name="rep_photo_image",
     ),
     path("j/<str:token>/", views.customer_join, name="customer_join"),
     path("c/", views.customer_capture, name="customer_capture"),
+    path("c/live/", views.customer_live, name="customer_live"),
     path("c/upload/", views.customer_upload, name="customer_upload"),
     path("c/photos/", views.customer_photos, name="customer_photos"),
     path(

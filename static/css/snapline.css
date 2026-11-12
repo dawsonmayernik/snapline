@@ -621,3 +621,10 @@ p {
 .link-danger:hover {
   text-decoration: underline;
 }
+
+.field-tight {
+  margin-bottom: 0;
+}
+#rep-request .notice {
+  margin-bottom: var(--sp-5);
+}

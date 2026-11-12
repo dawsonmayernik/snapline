@@ -32,6 +32,9 @@ TICKET_REFERENCE_MAX_LENGTH = 64
 # Maximum length of a privacy policy version label.
 POLICY_VERSION_MAX_LENGTH = 32
 
+# Maximum length of a photo request the rep sends to the customer.
+PHOTO_REQUEST_MAX_LENGTH = 200
+
 
 def generate_verification_code() -> str:
     """Generates a zero-padded random numeric verification code.
@@ -135,6 +138,12 @@ class SupportSession(models.Model):
 
     # When the session was closed, or null if still open.
     closed_at = models.DateTimeField(null=True, blank=True)
+
+    # The rep's current request shown at the top of the customer's screen,
+    photo_request = models.CharField(max_length=PHOTO_REQUEST_MAX_LENGTH, blank=True)
+
+    # When the current photo request was sent, or null if there is none.
+    photo_request_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         """Model options for SupportSession."""

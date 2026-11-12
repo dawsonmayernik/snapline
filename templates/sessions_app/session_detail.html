@@ -48,6 +48,23 @@
         </div>
       {% endif %}
     </div>
-    {% include "sessions_app/_photo_panel.html" %}
+    <div class="col-8 stack">
+      {% if support_session.is_open %}
+        <section class="tile">
+          <form method="post" action="{% url 'sessions_app:send_photo_request' support_session.pk %}">
+            {% csrf_token %}
+            <div class="field field-tight">
+              <label for="{{ request_form.text.id_for_label }}">{{ request_form.text.label }}</label>
+              <div class="input-group">
+                {{ request_form.text }}
+                <button type="submit" class="btn btn-primary btn-compact">Send request</button>
+              </div>
+              <p class="helper">The customer sees this at the top of their screen. Send it empty to clear it.</p>
+            </div>
+          </form>
+        </section>
+      {% endif %}
+      {% include "sessions_app/_photo_panel.html" %}
+    </div>
   </div>
 {% endblock %}
