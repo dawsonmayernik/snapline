@@ -1,0 +1,25 @@
+<section id="photo-panel" class="tile col-8" aria-live="polite"
+  {% if support_session.is_open %}
+    hx-get="{% url 'sessions_app:session_live' support_session.pk %}?state={{ live_state }}"
+    hx-trigger="every {{ poll_seconds }}s"
+    hx-swap="outerHTML"
+  {% endif %}>
+  <h2 class="h3 mb-5">Photos</h2>
+  {% if photos %}
+    <ul class="gallery">
+      {% for photo in photos %}
+        <li>
+          <a class="thumb" href="{% url 'sessions_app:rep_photo_image' support_session.pk photo.pk %}" target="_blank" rel="noopener">
+            <img src="{% url 'sessions_app:rep_photo_image' support_session.pk photo.pk %}" alt="Customer photo {{ forloop.counter }}">
+            <span class="cap"><span class="mono">{{ photo.uploaded_at|time:"H:i:s" }}</span> · Photo {{ forloop.counter }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty-plain">
+      <p>No photos yet.</p>
+      <p class="muted">{% if support_session.is_open %}Photos appear here automatically as the customer sends them.{% else %}No photos were sent in this session.{% endif %}</p>
+    </div>
+  {% endif %}
+</section>

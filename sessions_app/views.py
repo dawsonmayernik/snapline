@@ -1,10 +1,12 @@
 """Views for support reps (dashboard, sessions) and the customer join page."""
 
+import hashlib
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -151,6 +153,40 @@ def create_session(request):
     return redirect("sessions_app:session_detail", pk=support_session.pk)
 
 
+def _live_state(support_session: SupportSession) -> str:
+    """Fingerprint the parts of a session the rep's page shows live.
+
+    Parms:
+        support_session: The session to fingerprint.
+
+    Returns:
+        A short hash of the session's status, open state, and photo IDs.
+    """
+    photo_ids = ",".join(
+        str(pk) for pk in support_session.photos.values_list("pk", flat=True)
+    )
+    raw = f"{support_session.status}|{support_session.is_open}|{photo_ids}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _live_context(support_session: SupportSession) -> dict:
+    """Template context shared by the session page and its live updates.
+
+    Params:
+        support_session: The session being shown.
+
+    Returns:
+        The session, its photos, the live-state fingerprint, and the
+        polling interval.
+    """
+    return {
+        "support_session": support_session,
+        "photos": support_session.photos.all(),
+        "live_state": _live_state(support_session),
+        "poll_seconds": settings.SNAPLINE_LIVE_POLL_SECONDS,
+    }
+
+
 @login_required
 @require_GET
 @never_cache
@@ -173,12 +209,31 @@ def session_detail(request, pk):
     return render(
         request,
         "sessions_app/session_detail.html",
-        {
-            "support_session": support_session,
-            "join_url": join_url,
-            "photos": support_session.photos.all(),
-        },
+        {**_live_context(support_session), "join_url": join_url},
     )
+
+
+@require_GET
+@never_cache
+def session_live(request, pk):
+    """Live updates for the rep's session page, polled by htmx.
+
+    Params:
+        request: The current htmx polling request.
+        pk: The support session's UUID.
+
+    Returns:
+        204 if unchanged, or the updated fragments.
+    """
+    if not request.user.is_authenticated:
+        response = HttpResponse(status=204)
+        response["HX-Refresh"] = "true"
+        return response
+    support_session = _get_own_session(request, pk)
+    context = _live_context(support_session)
+    if request.GET.get("state") == context["live_state"]:
+        return HttpResponse(status=204)
+    return render(request, "sessions_app/_live_update.html", context)
 
 
 @login_required

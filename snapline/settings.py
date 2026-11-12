@@ -164,9 +164,11 @@ SNAPLINE_PHOTO_MAX_DIMENSION = 2560  # stored photos are shrunk to fit this
 SNAPLINE_PHOTO_JPEG_QUALITY = 85
 SNAPLINE_MAX_PHOTOS_PER_SESSION = 50
 
-# Uploaded photos. Intentionally no MEDIA_URL: photos are served only
-# through authenticated views, never as public static files.
+# Uploaded photos
 MEDIA_ROOT = BASE_DIR / "uploads"
+
+# How often the rep's session page checks for new photos, in seconds.
+SNAPLINE_LIVE_POLL_SECONDS = 3
 
 # Authentication
 LOGIN_URL = "login"
