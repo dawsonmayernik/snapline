@@ -17,7 +17,7 @@ from django.views.decorators.http import (
     require_POST,
 )
 
-from .forms import NewSessionForm, PhotoUploadForm
+from .forms import NewSessionForm, PhotoRequestForm, PhotoUploadForm
 from .images import InvalidImageError, sanitize_photo
 from .models import ConsentRecord, JoinToken, Photo, SupportSession
 
@@ -153,6 +153,31 @@ def create_session(request):
     return redirect("sessions_app:session_detail", pk=support_session.pk)
 
 
+def _fingerprint(*parts) -> str:
+    """Hash some values into a short, stable change-detection token.
+
+    Params:
+        parts: The values that, if any of them change, should change the
+        token.
+
+    Returns:
+        A 16-character hex digest.
+    """
+    raw = "|".join(str(part) for part in parts)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _refresh_page_response() -> HttpResponse:
+    """Tell an htmx-polling page to reload itself.
+
+    Returns:
+        An empty 204 response carrying the HX-Refresh header.
+    """
+    response = HttpResponse(status=204)
+    response["HX-Refresh"] = "true"
+    return response
+
+
 def _live_state(support_session: SupportSession) -> str:
     """Fingerprint the parts of a session the rep's page shows live.
 
@@ -165,8 +190,7 @@ def _live_state(support_session: SupportSession) -> str:
     photo_ids = ",".join(
         str(pk) for pk in support_session.photos.values_list("pk", flat=True)
     )
-    raw = f"{support_session.status}|{support_session.is_open}|{photo_ids}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+    return _fingerprint(support_session.status, support_session.is_open, photo_ids)
 
 
 def _live_context(support_session: SupportSession) -> dict:
@@ -209,7 +233,13 @@ def session_detail(request, pk):
     return render(
         request,
         "sessions_app/session_detail.html",
-        {**_live_context(support_session), "join_url": join_url},
+        {
+            **_live_context(support_session),
+            "join_url": join_url,
+            "request_form": PhotoRequestForm(
+                initial={"text": support_session.photo_request}
+            ),
+        },
     )
 
 
@@ -226,9 +256,7 @@ def session_live(request, pk):
         204 if unchanged, or the updated fragments.
     """
     if not request.user.is_authenticated:
-        response = HttpResponse(status=204)
-        response["HX-Refresh"] = "true"
-        return response
+        return _refresh_page_response()
     support_session = _get_own_session(request, pk)
     context = _live_context(support_session)
     if request.GET.get("state") == context["live_state"]:
@@ -251,6 +279,33 @@ def reissue_link(request, pk):
     support_session = _get_own_session(request, pk)
     if support_session.is_open:
         _issue_link(request, support_session)
+    return redirect("sessions_app:session_detail", pk=support_session.pk)
+
+
+@login_required
+@require_POST
+def send_photo_request(request, pk):
+    """Show a request to the customer.
+
+    Params:
+        request: The current request containing PhotoRequestForm data.
+        pk: The support session's UUID.
+
+    Returns:
+        A redirect to the session detail page.
+    """
+    support_session = _get_own_session(request, pk)
+    form = PhotoRequestForm(request.POST)
+    if not support_session.is_open:
+        messages.error(request, "This session has ended.")
+    elif not form.is_valid():
+        messages.error(request, "That request is too long.")
+    else:
+        text = form.cleaned_data["text"]
+        support_session.photo_request = text
+        support_session.photo_request_at = timezone.now() if text else None
+        support_session.save(update_fields=["photo_request", "photo_request_at"])
+        messages.success(request, "Request sent." if text else "Request cleared.")
     return redirect("sessions_app:session_detail", pk=support_session.pk)
 
 
@@ -409,6 +464,25 @@ def _joined_open_session(request):
     return support_session, None
 
 
+def _customer_live_context(support_session: SupportSession) -> dict:
+    """Template context for the rep's request shown to the customer.
+
+    Params:
+        support_session: The customer's open support session.
+
+    Returns:
+        The session, a fingerprint of its current photo request, and
+        the polling interval.
+    """
+    return {
+        "support_session": support_session,
+        "request_state": _fingerprint(
+            support_session.photo_request, support_session.photo_request_at
+        ),
+        "poll_seconds": settings.SNAPLINE_LIVE_POLL_SECONDS,
+    }
+
+
 def _render_capture(request, support_session, error=None, status=200):
     """Render the customer's take-a-photo page.
 
@@ -425,7 +499,7 @@ def _render_capture(request, support_session, error=None, status=200):
         request,
         "customer/capture.html",
         {
-            "support_session": support_session,
+            **_customer_live_context(support_session),
             "photo_count": support_session.photos.count(),
             "error": error,
         },
@@ -448,6 +522,27 @@ def customer_capture(request):
     if error_response:
         return error_response
     return _render_capture(request, support_session)
+
+
+@require_GET
+@never_cache
+def customer_live(request):
+    """Live updates for the customer's page, polled by htmx.
+
+    Params:
+        request: The current htmx polling request from the customer.
+
+    Returns:
+        204 if unchanged, the updated request banner, or a reload
+        instruction.
+    """
+    support_session = _customer_session(request)
+    if support_session is None or not support_session.is_open:
+        return _refresh_page_response()
+    context = _customer_live_context(support_session)
+    if request.GET.get("state") == context["request_state"]:
+        return HttpResponse(status=204)
+    return render(request, "customer/_rep_request.html", context)
 
 
 def _validate_upload(request):

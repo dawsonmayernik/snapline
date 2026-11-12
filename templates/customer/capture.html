@@ -1,6 +1,7 @@
 {% extends "customer_base.html" %}
 {% block title %}Take a photo · Snapline{% endblock %}
 {% block content %}
+  {% include "customer/_rep_request.html" %}
   <div class="stack">
     {% if error %}
       {% include "includes/notice.html" with kind="error" title="Not sent." message=error %}

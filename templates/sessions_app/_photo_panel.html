@@ -1,4 +1,4 @@
-<section id="photo-panel" class="tile col-8" aria-live="polite"
+<section id="photo-panel" class="tile" aria-live="polite"
   {% if support_session.is_open %}
     hx-get="{% url 'sessions_app:session_live' support_session.pk %}?state={{ live_state }}"
     hx-trigger="every {{ poll_seconds }}s"

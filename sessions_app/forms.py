@@ -2,7 +2,11 @@
 
 from django import forms
 
-from .models import PHONE_HINT_DIGITS, TICKET_REFERENCE_MAX_LENGTH
+from .models import (
+    PHONE_HINT_DIGITS,
+    PHOTO_REQUEST_MAX_LENGTH,
+    TICKET_REFERENCE_MAX_LENGTH,
+)
 
 # Fewest digits accepted for a phone number (a US number without country code).
 PHONE_MIN_DIGITS = 10
@@ -69,3 +73,20 @@ class PhotoUploadForm(forms.Form):
     """Form carrying one photo from the customer's phone."""
 
     photo = forms.FileField()
+
+
+class PhotoRequestForm(forms.Form):
+    """Form a rep uses to ask the customer for a specific photo."""
+
+    # The request text shown to the customer.
+    text = forms.CharField(
+        max_length=PHOTO_REQUEST_MAX_LENGTH,
+        required=False,
+        label="Request a photo",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Can you get a shot of the back of the switch?",
+                "autocomplete": "off",
+            }
+        ),
+    )
