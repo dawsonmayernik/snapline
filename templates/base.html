@@ -6,6 +6,7 @@
   <title>{% block title %}Snapline{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/snapline.css' %}">
   <script src="{% static 'js/snapline.js' %}"></script>
+  {% block head_extra %}{% endblock %}
 </head>
 <body>
   <div class="shell">

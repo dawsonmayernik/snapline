@@ -12,6 +12,7 @@ urlpatterns = [
     path("sessions/<uuid:pk>/", views.session_detail, name="session_detail"),
     path("sessions/<uuid:pk>/link/", views.reissue_link, name="reissue_link"),
     path("sessions/<uuid:pk>/close/", views.close_session, name="close_session"),
+    path("sessions/<uuid:pk>/live/", views.session_live, name="session_live"),
     path(
         "sessions/<uuid:pk>/photos/<uuid:photo_id>/",
         views.rep_photo_image,
